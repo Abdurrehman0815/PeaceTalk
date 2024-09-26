@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory
 import google.generativeai as genai
-from twilio.rest import Client
 import os
 from dotenv import load_dotenv
 
@@ -31,53 +30,15 @@ model = genai.GenerativeModel(
 # Initialize chat session
 chat_session = model.start_chat(history=[])
 
-# Twilio credentials from environment variables
-account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-twilio_number = os.getenv("TWILIO_NUMBER")
-doctor_number = os.getenv("DOCTOR_NUMBER")
-
-# Initialize Twilio client
-client = Client(account_sid, auth_token)
-
-# Define abnormal words
-abnormal_words = [
-    "killing", "die", "suicide", "self-harm", "self-injury", "overdose", "harm", 
-    "depression","end my life", "take my life", "commit suicide", 
-    "poison", "cut", "murder", "assault", "danger", "dangerous", "death", "die by", "end it all", 
-    "end it", "not worth living", "worthless"
-]
-
-def trigger_call(user_id):
-    try:
-        call_message = f"Alert: User ID {user_id} has mentioned concerning words in their chat. Please check on them immediately."
-        twiml_response = f'<Response><Say>{call_message}</Say><Pause length="1"/><Say>{call_message}</Say></Response>'
-        
-        # Create the call
-        call = client.calls.create(
-            twiml=twiml_response,
-            to=doctor_number,
-            from_=twilio_number
-        )
-        print(f"Call triggered to doctor: {call.sid}")
-    except Exception as e:
-        print(f"Failed to trigger call: {e}")
-
 @app.route("/chat", methods=["POST"])
 def chat():
     try:
         user_input = request.json.get("message")
-        user_id = request.json.get("user_id")
 
-        if user_input is None or user_id is None:
+        if user_input is None:
             return jsonify({"error": "Invalid request"}), 400
 
-        print(f"Received user input: {user_input} from user_id: {user_id}")
-
-        # Check for abnormal words in user input
-        if any(word in user_input.lower() for word in abnormal_words):
-            print(f"Abnormal word detected. Triggering call for user_id: {user_id}")
-            trigger_call(user_id)
+        print(f"Received user input: {user_input}")
 
         # Generate the response from the model
         response = chat_session.send_message(user_input)
@@ -93,8 +54,7 @@ def chat():
 
 @app.route("/")
 def index():
-    return send_from_directory('static', 'index.html')
+    return send_from_directory('templates', 'index.html')
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
